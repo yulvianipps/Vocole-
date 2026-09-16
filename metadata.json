@@ -1,0 +1,6 @@
+{
+  "name": "Oxford 3000 Vocabulary Tutor",
+  "description": "Platform belajar kosakata bahasa Inggris Oxford 3000™ American English bertahap A1-B2 dengan audio, latihan berbicara, kuis konteks, dan spaced repetition.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
