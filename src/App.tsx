@@ -12,6 +12,9 @@ import { StoriesView } from './components/StoriesView';
 import { AudioModeModal } from './components/AudioModeModal';
 import { PlacementTestModal } from './components/PlacementTestModal';
 import { SettingsModal } from './components/SettingsModal';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
+import { SpellingTestView } from './components/SpellingTestView';
+import { SpeedChallengeModal } from './components/SpeedChallengeModal';
 import { OXFORD_WORDS } from './data/oxfordWords';
 import { 
   loadUserStats, 
@@ -36,6 +39,8 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAudioModeOpen, setIsAudioModeOpen] = useState<boolean>(false);
   const [isPlacementTestOpen, setIsPlacementTestOpen] = useState<boolean>(false);
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState<boolean>(false);
+  const [isSpeedChallengeOpen, setIsSpeedChallengeOpen] = useState<boolean>(false);
   const [isLoaded, setIsLoaded] = useState<boolean>(false);
 
   // Load persistence on initial mount
@@ -45,6 +50,18 @@ export default function App() {
     setStats(loadedStats);
     setProgressMap(loadedProgress);
     setIsLoaded(true);
+  }, []);
+
+  // Global keyboard shortcut: Ctrl+K / Cmd+K to open Search Command Palette
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsGlobalSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // Sync dark mode class on document element
@@ -164,6 +181,29 @@ export default function App() {
     handleUpdateStats(newStats);
   };
 
+  // Record spelling test answer
+  const handleSpellingWordComplete = (wordId: string, isCorrect: boolean) => {
+    const rating = isCorrect ? 'know' : 'dont_know';
+    const { updatedMap } = updateWordSRS(wordId, rating, progressMap);
+    setProgressMap(updatedMap);
+
+    const newStats = {
+      ...stats,
+      todayQuizTotal: stats.todayQuizTotal + 1,
+      todayQuizCorrect: isCorrect ? stats.todayQuizCorrect + 1 : stats.todayQuizCorrect,
+      todayReviewedCount: stats.todayReviewedCount + 1
+    };
+    handleUpdateStats(newStats);
+  };
+
+  // Speed challenge high score
+  const handleSpeedHighScore = (newHighScore: number) => {
+    const currentHigh = stats.gameStats?.wordMatchHighScore || 0;
+    if (newHighScore > currentHigh) {
+      handleUpdateGameStats('word_match', newHighScore);
+    }
+  };
+
   // Reset entire progress
   const handleResetProgress = () => {
     localStorage.clear();
@@ -222,10 +262,12 @@ export default function App() {
         onToggleDarkMode={handleToggleDarkMode}
         onOpenAudioMode={() => setIsAudioModeOpen(true)}
         onOpenPlacementTest={() => setIsPlacementTestOpen(true)}
+        onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
+        onOpenSpeedChallenge={() => setIsSpeedChallengeOpen(true)}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-6 pb-24 xl:pb-12">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-20 lg:pb-12">
         {activeTab === 'home' && (
           <HomeView
             todayWords={todayWords}
@@ -248,6 +290,8 @@ export default function App() {
             onToggleFavorite={handleToggleFavorite}
             onOpenAudioMode={() => setIsAudioModeOpen(true)}
             onOpenPlacementTest={() => setIsPlacementTestOpen(true)}
+            onOpenSpeedChallenge={() => setIsSpeedChallengeOpen(true)}
+            onStartSpellingTest={() => setActiveTab('spelling')}
           />
         )}
 
@@ -273,6 +317,15 @@ export default function App() {
             onRateWord={handleRateWord}
             onToggleFavorite={handleToggleFavorite}
             onSwitchTab={setActiveTab}
+          />
+        )}
+
+        {activeTab === 'spelling' && (
+          <SpellingTestView
+            words={todayWords.length > 0 ? todayWords : OXFORD_WORDS.filter(w => w.level === stats.currentLevel)}
+            stats={stats}
+            onWordComplete={handleSpellingWordComplete}
+            onFinishTest={() => {}}
           />
         )}
 
@@ -362,6 +415,26 @@ export default function App() {
         onClose={() => setIsPlacementTestOpen(false)}
         onComplete={handlePlacementComplete}
         currentLevel={stats.currentLevel}
+      />
+
+      {/* Global Command Palette / Search Modal (Ctrl + K) */}
+      <GlobalSearchModal
+        isOpen={isGlobalSearchOpen}
+        onClose={() => setIsGlobalSearchOpen(false)}
+        words={OXFORD_WORDS}
+        progressMap={progressMap}
+        stats={stats}
+        onSelectWordForTutor={handleSelectWord}
+        onToggleFavorite={handleToggleFavorite}
+      />
+
+      {/* Daily 60-Second Speed Quiz Challenge */}
+      <SpeedChallengeModal
+        isOpen={isSpeedChallengeOpen}
+        onClose={() => setIsSpeedChallengeOpen(false)}
+        words={OXFORD_WORDS}
+        stats={stats}
+        onUpdateHighScore={handleSpeedHighScore}
       />
     </div>
   );

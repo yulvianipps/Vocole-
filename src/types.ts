@@ -93,6 +93,7 @@ export interface UserStats {
   dailyTarget: number; // 5, 10, 15, 20 (default 10)
   currentLevel: CEFRLevel;
   voiceSpeed: number; // 0.8 to 1.2 (default 0.95)
+  voiceAccent?: 'us' | 'uk'; // American vs British English
   soundEnabled: boolean;
   darkMode?: boolean;
   unlockedBadges?: string[]; // list of badge IDs
@@ -102,6 +103,7 @@ export interface UserStats {
     wordMatchHighScore?: number;
     sentenceScrambleHighScore?: number;
     dictationHighScore?: number;
+    speedChallengeHighScore?: number;
     totalGamesPlayed?: number;
   };
   userSentences?: { [wordId: string]: string }; // saved user sentences

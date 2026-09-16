@@ -1,32 +1,45 @@
 /**
- * Speech synthesis (American English TTS) and Speech Recognition helper.
+ * Speech synthesis (American US & British UK English TTS) and Speech Recognition helper.
  */
 
-// Voice caching
 let selectedUsVoice: SpeechSynthesisVoice | null = null;
+let selectedUkVoice: SpeechSynthesisVoice | null = null;
+let currentGlobalAccent: 'us' | 'uk' = 'us';
 
-function loadUsVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+export function setGlobalSpeechAccent(accent: 'us' | 'uk') {
+  currentGlobalAccent = accent;
+}
+
+function loadVoices(): void {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
   const voices = window.speechSynthesis.getVoices();
-  // Find en-US voice or generic en voice
-  const usVoice = voices.find(
-    (v) => v.lang === 'en-US' || v.lang === 'en_US' || v.name.toLowerCase().includes('united states') || v.name.toLowerCase().includes('american')
-  ) || voices.find((v) => v.lang.startsWith('en'));
-  selectedUsVoice = usVoice || null;
-  return selectedUsVoice;
+
+  // Find en-US voice
+  selectedUsVoice = voices.find(
+    (v) => (v.lang === 'en-US' || v.lang === 'en_US') && (v.name.toLowerCase().includes('united states') || v.name.toLowerCase().includes('american') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('google'))
+  ) || voices.find((v) => v.lang === 'en-US' || v.lang === 'en_US') || voices.find((v) => v.lang.startsWith('en')) || null;
+
+  // Find en-GB voice
+  selectedUkVoice = voices.find(
+    (v) => (v.lang === 'en-GB' || v.lang === 'en_GB') && (v.name.toLowerCase().includes('united kingdom') || v.name.toLowerCase().includes('british') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('george') || v.name.toLowerCase().includes('google uk'))
+  ) || voices.find((v) => v.lang === 'en-GB' || v.lang === 'en_GB') || selectedUsVoice;
 }
 
 if (typeof window !== 'undefined' && window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => {
-    loadUsVoice();
+    loadVoices();
   };
-  loadUsVoice();
+  loadVoices();
 }
 
 /**
- * Play American English pronunciation using Web Speech API
+ * Play English pronunciation (American or British) using Web Speech API
  */
-export function playPronunciation(text: string, speed: number = 0.9): Promise<void> {
+export function playPronunciation(
+  text: string, 
+  speed: number = 0.9, 
+  accent?: 'us' | 'uk'
+): Promise<void> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       resolve();
@@ -36,12 +49,17 @@ export function playPronunciation(text: string, speed: number = 0.9): Promise<vo
     // Cancel current speaking
     window.speechSynthesis.cancel();
 
+    const targetAccent = accent || currentGlobalAccent;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
+    utterance.lang = targetAccent === 'uk' ? 'en-GB' : 'en-US';
     utterance.rate = Math.max(0.6, Math.min(1.4, speed));
     utterance.pitch = 1.0;
 
-    const voice = selectedUsVoice || loadUsVoice();
+    if (!selectedUsVoice && !selectedUkVoice) {
+      loadVoices();
+    }
+
+    const voice = targetAccent === 'uk' ? (selectedUkVoice || selectedUsVoice) : (selectedUsVoice || selectedUkVoice);
     if (voice) {
       utterance.voice = voice;
     }

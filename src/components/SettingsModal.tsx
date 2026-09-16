@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, Sliders, Volume2, RotateCcw, ShieldCheck, Check, Moon, Sun } from 'lucide-react';
+import { X, Sliders, Volume2, RotateCcw, ShieldCheck, Check, Moon, Sun, Globe } from 'lucide-react';
 import { CEFRLevel, UserStats } from '../types';
 import { CEFR_LEVEL_METADATA } from '../data/oxfordWords';
+import { setGlobalSpeechAccent } from '../utils/speech';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,9 +30,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const levels: CEFRLevel[] = ['A1', 'A2', 'B1', 'B2'];
 
+  const handleAccentChange = (accent: 'us' | 'uk') => {
+    setGlobalSpeechAccent(accent);
+    onUpdateStats({ ...stats, voiceAccent: accent });
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 sm:p-8 shadow-xl space-y-6 relative">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 sm:p-8 shadow-xl space-y-6 relative max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center gap-2.5">
@@ -72,12 +78,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
 
+        {/* Voice Accent: US vs UK */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+            Aksen Suara Pengucapan (Voice Accent)
+          </label>
+          <div className="grid grid-cols-2 gap-2.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => handleAccentChange('us')}
+              className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${
+                (stats.voiceAccent || 'us') === 'us'
+                  ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/60 ring-1 ring-indigo-400'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-2xl">🇺🇸</span>
+              <div>
+                <p className="text-xs font-black text-slate-900 dark:text-white">American (US)</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Pengucapan standar Amerika</p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleAccentChange('uk')}
+              className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${
+                stats.voiceAccent === 'uk'
+                  ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/60 ring-1 ring-indigo-400'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-2xl">🇬🇧</span>
+              <div>
+                <p className="text-xs font-black text-slate-900 dark:text-white">British (UK)</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">Pengucapan khas British (RP)</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* 1. Daily Words Target */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
             Target Kosakata Harian (Daily Target)
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Default 10 kata per hari agar pembelajaran tidak terasa membebani.
           </p>
           <div className="grid grid-cols-4 gap-2 pt-1">
@@ -91,7 +137,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className={`py-2.5 rounded-xl text-xs sm:text-sm font-extrabold border transition-all ${
                     isSelected
                       ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   {count} Words
@@ -103,8 +149,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* 2. Audio Pronunciation Speed */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-            Kecepatan Pengucapan (American Voice Speed)
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
+            Kecepatan Pengucapan (Voice Speed)
           </label>
           <div className="grid grid-cols-3 gap-2 pt-1">
             {speedOptions.map((sp) => {
@@ -116,8 +162,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => onUpdateStats({ ...stats, voiceSpeed: sp.value })}
                   className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all ${
                     isSelected
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs dark:bg-indigo-600 dark:border-indigo-600'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
                   }`}
                 >
                   {sp.label}
@@ -129,7 +175,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* 3. Level Selection */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider block">
             Level Aktif Saat Ini
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
@@ -143,15 +189,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   onClick={() => onUpdateStats({ ...stats, currentLevel: lvl })}
                   className={`p-2.5 rounded-xl border text-left transition-all ${
                     isSelected
-                      ? 'border-indigo-500 bg-indigo-50/70 ring-1 ring-indigo-300'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                      ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 ring-1 ring-indigo-300'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center gap-1">
                     <span>{meta.icon}</span>
-                    <span className="text-xs font-black text-slate-900">{lvl}</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">{lvl}</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 block truncate">{meta.name}</span>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">{meta.name}</span>
                 </button>
               );
             })}
@@ -159,7 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* 4. Reset progress */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <button
             type="button"
             onClick={() => {

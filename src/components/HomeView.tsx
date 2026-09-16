@@ -8,15 +8,16 @@ import {
   Flame, 
   AlertCircle, 
   Sparkles, 
-  ArrowRight,
-  TrendingUp,
-  Bookmark,
-  Gamepad2,
-  Headphones,
-  GraduationCap,
-  MessageSquare,
-  Activity,
-  Zap
+  ArrowRight, 
+  TrendingUp, 
+  Bookmark, 
+  Gamepad2, 
+  Headphones, 
+  GraduationCap, 
+  MessageSquare, 
+  Activity, 
+  Zap,
+  PenTool
 } from 'lucide-react';
 import { CEFRLevel, OxfordWord, UserStats, WordProgress } from '../types';
 import { CEFR_LEVEL_METADATA } from '../data/oxfordWords';
@@ -38,6 +39,8 @@ interface HomeViewProps {
   onToggleFavorite: (wordId: string) => void;
   onOpenAudioMode?: () => void;
   onOpenPlacementTest?: () => void;
+  onOpenSpeedChallenge?: () => void;
+  onStartSpellingTest?: () => void;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -55,7 +58,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
   onSwitchTab,
   onToggleFavorite,
   onOpenAudioMode,
-  onOpenPlacementTest
+  onOpenPlacementTest,
+  onOpenSpeedChallenge,
+  onStartSpellingTest
 }) => {
   // Determine time-of-day greeting
   const hour = new Date().getHours();
@@ -165,6 +170,28 @@ export const HomeView: React.FC<HomeViewProps> = ({
               <CheckCircle className="w-4 h-4" />
               Kuis Cepat
             </button>
+
+            <button
+              id="btn-quick-spelling"
+              onClick={() => onStartSpellingTest ? onStartSpellingTest() : onSwitchTab('spelling')}
+              className="inline-flex items-center gap-2 px-4 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/10 transition-colors"
+              title="Latihan Dikte / Listening Spelling Test"
+            >
+              <PenTool className="w-4 h-4 text-emerald-300" />
+              Tes Dikte
+            </button>
+
+            {onOpenSpeedChallenge && (
+              <button
+                id="btn-quick-speed"
+                onClick={onOpenSpeedChallenge}
+                className="inline-flex items-center gap-2 px-4 py-3.5 rounded-xl bg-amber-400/20 hover:bg-amber-400/30 text-amber-200 font-bold text-sm border border-amber-300/30 transition-colors"
+                title="Tantangan 60 Detik Cepat"
+              >
+                <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                60s Speed
+              </button>
+            )}
 
             <button
               id="btn-quick-games"

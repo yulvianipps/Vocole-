@@ -12,11 +12,14 @@ import {
   BookOpen,
   Printer,
   Download,
-  Pencil
+  Pencil,
+  ArrowUpDown,
+  Layers
 } from 'lucide-react';
 import { CEFRLevel, OxfordWord, UserStats, WordProgress } from '../types';
 import { CEFR_LEVEL_METADATA } from '../data/oxfordWords';
 import { playPronunciation } from '../utils/speech';
+import { PrintFlashcardsModal } from './PrintFlashcardsModal';
 
 interface MyWordsViewProps {
   allWords: OxfordWord[];
@@ -40,7 +43,20 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
   const [selectedLevel, setSelectedLevel] = useState<string>('all');
   const [selectedPos, setSelectedPos] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedLetter, setSelectedLetter] = useState<string>('ALL');
+  const [sortOption, setSortOption] = useState<'az' | 'za' | 'level_asc' | 'level_desc'>('az');
+  const [visibleCount, setVisibleCount] = useState<number>(24);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Level counts
+  const levelCounts = useMemo(() => {
+    return {
+      A1: allWords.filter(w => w.level === 'A1').length,
+      A2: allWords.filter(w => w.level === 'A2').length,
+      B1: allWords.filter(w => w.level === 'B1').length,
+      B2: allWords.filter(w => w.level === 'B2').length,
+    };
+  }, [allWords]);
 
   // Export to CSV for Anki / Spreadsheet
   const handleExportCSV = () => {
@@ -84,7 +100,7 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
     return allWords.filter((w) => progressMap[w.id]?.isFavorite);
   }, [allWords, progressMap]);
 
-  // Apply filters
+  // Apply filters & sort
   const displayedWords = useMemo(() => {
     let list = allWords;
     if (activeTab === 'favorites') {
@@ -93,7 +109,7 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
       list = struggledWordsList;
     }
 
-    return list.filter((item) => {
+    const filtered = list.filter((item) => {
       // Search text filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -106,6 +122,13 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
       // Level filter
       if (selectedLevel !== 'all' && item.level !== selectedLevel) {
         return false;
+      }
+
+      // Alphabet jump filter
+      if (selectedLetter !== 'ALL') {
+        if (!item.word.toUpperCase().startsWith(selectedLetter)) {
+          return false;
+        }
       }
 
       // POS filter
@@ -125,16 +148,32 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
 
       return true;
     });
-  }, [allWords, activeTab, favoriteWordsList, struggledWordsList, searchQuery, selectedLevel, selectedPos, selectedStatus, progressMap]);
+
+    // Sorting
+    return filtered.sort((a, b) => {
+      if (sortOption === 'az') return a.word.localeCompare(b.word);
+      if (sortOption === 'za') return b.word.localeCompare(a.word);
+      const levelRank: Record<CEFRLevel, number> = { A1: 1, A2: 2, B1: 3, B2: 4 };
+      if (sortOption === 'level_asc') {
+        return levelRank[a.level] - levelRank[b.level] || a.word.localeCompare(b.word);
+      }
+      if (sortOption === 'level_desc') {
+        return levelRank[b.level] - levelRank[a.level] || a.word.localeCompare(b.word);
+      }
+      return 0;
+    });
+  }, [allWords, activeTab, favoriteWordsList, struggledWordsList, searchQuery, selectedLevel, selectedLetter, selectedPos, selectedStatus, sortOption, progressMap]);
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedLevel('all');
+    setSelectedLetter('ALL');
     setSelectedPos('all');
     setSelectedStatus('all');
   };
 
-  const hasActiveFilters = searchQuery || selectedLevel !== 'all' || selectedPos !== 'all' || selectedStatus !== 'all';
+  const hasActiveFilters = searchQuery || selectedLevel !== 'all' || selectedLetter !== 'ALL' || selectedPos !== 'all' || selectedStatus !== 'all';
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
   return (
     <div className="space-y-6 pb-16">
@@ -211,42 +250,111 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
 
       {/* Search & Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
-        {/* Search Input */}
-        <div className="relative">
-          <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari kata (contoh: achieve, borrow, nasihat)..."
-            className="w-full pl-11 pr-10 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:outline-none text-sm font-medium transition-all"
-          />
-          {searchQuery && (
+        {/* Top search & sorting line */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setVisibleCount(24);
+              }}
+              placeholder="Cari kata (contoh: achieve, borrow, nasihat)..."
+              className="w-full pl-11 pr-10 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 focus:outline-none text-sm font-medium transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+              <span>Urutan:</span>
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as any)}
+                className="bg-transparent font-extrabold text-indigo-700 focus:outline-none cursor-pointer"
+              >
+                <option value="az">A ke Z</option>
+                <option value="za">Z ke A</option>
+                <option value="level_asc">Level (A1 → B2)</option>
+                <option value="level_desc">Level (B2 → A1)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Alphabet Quick Jump Bar */}
+        <div className="pt-1 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex items-center gap-1 min-w-max">
+            <span className="text-[11px] font-bold text-slate-400 mr-1">Abjad:</span>
             <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+              onClick={() => {
+                setSelectedLetter('ALL');
+                setVisibleCount(24);
+              }}
+              className={`px-2 py-0.5 rounded-md text-xs font-bold transition-all ${
+                selectedLetter === 'ALL'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
             >
-              <X className="w-4 h-4" />
+              Semua
             </button>
-          )}
+            {alphabet.map((letter) => (
+              <button
+                key={letter}
+                onClick={() => {
+                  setSelectedLetter(letter);
+                  setVisibleCount(24);
+                }}
+                className={`w-6 h-6 rounded-md text-xs font-bold transition-all flex items-center justify-center ${
+                  selectedLetter === letter
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-indigo-600'
+                }`}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Filter Dropdowns / Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
           {/* Level Filter */}
-          <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
+          <div className="flex items-center gap-1 text-xs font-semibold text-slate-600 flex-wrap">
             <span className="text-slate-400">Level:</span>
-            {['all', 'A1', 'A2', 'B1', 'B2'].map((lvl) => (
+            {[
+              { id: 'all', label: `Semua (${allWords.length})` },
+              { id: 'A1', label: `A1 (${levelCounts.A1})` },
+              { id: 'A2', label: `A2 (${levelCounts.A2})` },
+              { id: 'B1', label: `B1 (${levelCounts.B1})` },
+              { id: 'B2', label: `B2 (${levelCounts.B2})` }
+            ].map((lvl) => (
               <button
-                key={lvl}
-                onClick={() => setSelectedLevel(lvl)}
+                key={lvl.id}
+                onClick={() => {
+                  setSelectedLevel(lvl.id);
+                  setVisibleCount(24);
+                }}
                 className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all ${
-                  selectedLevel === lvl
+                  selectedLevel === lvl.id
                     ? 'bg-slate-900 text-white border-slate-900'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
               >
-                {lvl === 'all' ? 'Semua' : lvl}
+                {lvl.label}
               </button>
             ))}
           </div>
@@ -265,7 +373,10 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
             ].map((p) => (
               <button
                 key={p.id}
-                onClick={() => setSelectedPos(p.id)}
+                onClick={() => {
+                  setSelectedPos(p.id);
+                  setVisibleCount(24);
+                }}
                 className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all ${
                   selectedPos === p.id
                     ? 'bg-indigo-600 text-white border-indigo-600'
@@ -285,7 +396,10 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
             {['all', 'NEW', 'LEARNING', 'REVIEW', 'MASTERED'].map((st) => (
               <button
                 key={st}
-                onClick={() => setSelectedStatus(st)}
+                onClick={() => {
+                  setSelectedStatus(st);
+                  setVisibleCount(24);
+                }}
                 className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-all ${
                   selectedStatus === st
                     ? 'bg-slate-800 text-white border-slate-800'
@@ -321,6 +435,17 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
         </div>
       )}
 
+      {/* Counter summary */}
+      <div className="flex items-center justify-between text-xs text-slate-500 px-1 font-semibold">
+        <span>
+          Menampilkan {Math.min(visibleCount, displayedWords.length)} dari <strong>{displayedWords.length}</strong> kosakata
+          {selectedLevel !== 'all' ? ` (Level ${selectedLevel})` : ''}
+        </span>
+        <span className="text-[11px] text-slate-400">
+          Aksen Audio: <strong>{stats.voiceAccent === 'uk' ? '🇬🇧 British (UK)' : '🇺🇸 American (US)'}</strong>
+        </span>
+      </div>
+
       {/* Words Grid / List */}
       {displayedWords.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto">
@@ -338,186 +463,143 @@ export const MyWordsView: React.FC<MyWordsViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {displayedWords.map((item, index) => {
-            const p = progressMap[item.id];
-            const isFav = p?.isFavorite || false;
-            const status = p?.status || 'NEW';
-            const levelMeta = CEFR_LEVEL_METADATA[item.level];
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {displayedWords.slice(0, visibleCount).map((item) => {
+              const p = progressMap[item.id];
+              const isFav = p?.isFavorite || false;
+              const status = p?.status || 'NEW';
+              const levelMeta = CEFR_LEVEL_METADATA[item.level];
 
-            return (
-              <div
-                key={item.id}
-                id={`vocab-item-${item.id}`}
-                className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-lg font-black text-slate-900 uppercase group-hover:text-indigo-600 transition-colors">
-                        {item.word}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500 italic">
-                        {item.pos}
-                      </span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${levelMeta.badgeBg}`}>
-                        {item.level}
-                      </span>
-                      {status !== 'NEW' && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                          status === 'MASTERED'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : status === 'REVIEW'
-                            ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {status}
+              return (
+                <div
+                  key={item.id}
+                  id={`vocab-item-${item.id}`}
+                  className="bg-white border border-slate-200 hover:border-indigo-300 rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all flex flex-col justify-between gap-3 group"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-lg font-black text-slate-900 uppercase group-hover:text-indigo-600 transition-colors">
+                          {item.word}
                         </span>
-                      )}
-                      {p && p.mistakesCount > 0 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                          {p.mistakesCount}x salah
+                        <span className="text-xs font-medium text-slate-500 italic">
+                          {item.pos}
                         </span>
-                      )}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${levelMeta.badgeBg}`}>
+                          {item.level}
+                        </span>
+                        {status !== 'NEW' && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            status === 'MASTERED'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : status === 'REVIEW'
+                              ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {status}
+                          </span>
+                        )}
+                        {p && p.mistakesCount > 0 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                            {p.mistakesCount}x salah
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => playPronunciation(item.word, stats.voiceSpeed, stats.voiceAccent || 'us')}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title={`Dengarkan pengucapan ${stats.voiceAccent === 'uk' ? 'British (UK)' : 'American (US)'}`}
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          onClick={() => onToggleFavorite(item.id)}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            isFav
+                              ? 'text-rose-500 hover:bg-rose-50'
+                              : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+                          }`}
+                          title={isFav ? 'Hapus dari favorit' : 'Simpan favorit'}
+                        >
+                          <Bookmark className={`w-4 h-4 ${isFav ? 'fill-rose-500' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => playPronunciation(item.word, stats.voiceSpeed)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Dengarkan pengucapan American English"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                      </button>
+                    <p className="text-sm font-extrabold text-indigo-950">
+                      = {item.meaningId}
+                    </p>
 
-                      <button
-                        onClick={() => onToggleFavorite(item.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          isFav
-                            ? 'text-rose-500 hover:bg-rose-50'
-                            : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
-                        }`}
-                        title={isFav ? 'Hapus dari favorit' : 'Simpan favorit'}
-                      >
-                        <Bookmark className={`w-4 h-4 ${isFav ? 'fill-rose-500' : ''}`} />
-                      </button>
-                    </div>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">
+                      {item.phonetic} <span className="font-sans text-slate-400">({item.phoneticSimple})</span>
+                    </p>
+
+                    <p className="text-xs text-slate-600 mt-2 line-clamp-2">
+                      “{item.example}”
+                    </p>
+
+                    {/* Display user sentence if written */}
+                    {stats.userSentences?.[item.id] && (
+                      <div className="mt-2.5 p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100 text-xs">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1">
+                          <Pencil className="w-3 h-3" /> Kalimat Buatanmu:
+                        </span>
+                        <p className="font-semibold text-indigo-950 mt-0.5 italic">
+                          "{stats.userSentences[item.id]}"
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <p className="text-sm font-extrabold text-indigo-950">
-                    = {item.meaningId}
-                  </p>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                      {item.simpleExplanation}
+                    </span>
 
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">
-                    {item.phonetic} <span className="font-sans text-slate-400">({item.phoneticSimple})</span>
-                  </p>
-
-                  <p className="text-xs text-slate-600 mt-2 line-clamp-2">
-                    “{item.example}”
-                  </p>
-
-                  {/* Display user sentence if written */}
-                  {stats.userSentences?.[item.id] && (
-                    <div className="mt-2.5 p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100 text-xs">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1">
-                        <Pencil className="w-3 h-3" /> Kalimat Buatanmu:
-                      </span>
-                      <p className="font-semibold text-indigo-950 mt-0.5 italic">
-                        "{stats.userSentences[item.id]}"
-                      </p>
-                    </div>
-                  )}
+                    <button
+                      onClick={() => onSelectWordForTutor(item)}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0 ml-2"
+                    >
+                      Buka di Tutor
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400">
-                    {item.simpleExplanation}
-                  </span>
-
-                  <button
-                    onClick={() => onSelectWordForTutor(item)}
-                    className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors shrink-0 ml-2"
-                  >
-                    Buka Tutor
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Print Cheatsheet Modal / View */}
-      {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-6 backdrop-blur-xs overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <h3 className="text-xl font-black text-slate-900">
-                  📄 Cetak Cheatsheet Kosakata Oxford 3000™
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Menampilkan {displayedWords.length} kata ({selectedLevel === 'all' ? 'Semua Level' : `Level ${selectedLevel}`}). Siap dicetak atau disimpan sebagai PDF.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsPrintModalOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto border border-slate-200 rounded-2xl p-4 bg-slate-50/50 print:bg-white print:border-none">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-300 text-slate-700 font-extrabold">
-                    <th className="py-2 px-2">Word</th>
-                    <th className="py-2 px-2">Pos</th>
-                    <th className="py-2 px-2">Level</th>
-                    <th className="py-2 px-2">Phonetic</th>
-                    <th className="py-2 px-2">Arti Bahasa Indonesia</th>
-                    <th className="py-2 px-2">Contoh Kalimat</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
-                  {displayedWords.map((w) => (
-                    <tr key={w.id} className="hover:bg-indigo-50/30">
-                      <td className="py-2 px-2 font-bold text-slate-900">{w.word}</td>
-                      <td className="py-2 px-2 text-slate-500 italic">{w.pos}</td>
-                      <td className="py-2 px-2">
-                        <span className="font-bold text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-800">
-                          {w.level}
-                        </span>
-                      </td>
-                      <td className="py-2 px-2 font-mono text-slate-600">{w.phonetic}</td>
-                      <td className="py-2 px-2 font-bold text-indigo-900">{w.meaningId}</td>
-                      <td className="py-2 px-2 text-slate-600 italic">“{w.example}”</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200">
-              <button
-                onClick={() => setIsPrintModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs sm:text-sm hover:bg-slate-50"
-              >
-                Tutup
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs sm:text-sm shadow-xs flex items-center gap-2"
-              >
-                <Printer className="w-4 h-4" />
-                Cetak / Simpan PDF (Ctrl+P)
-              </button>
-            </div>
+              );
+            })}
           </div>
+
+          {/* Load More Pagination Buttons */}
+          {displayedWords.length > visibleCount && (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + 24)}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm shadow-sm transition-all"
+              >
+                Muat 24 Kata Lagi (Sisa {displayedWords.length - visibleCount})
+              </button>
+              <button
+                onClick={() => setVisibleCount(displayedWords.length)}
+                className="px-5 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-all"
+              >
+                Tampilkan Semua ({displayedWords.length} Kata)
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Printable Flashcards & Cheatsheet Modal */}
+      <PrintFlashcardsModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        words={displayedWords}
+        currentLevel={stats.currentLevel}
+      />
     </div>
   );
 };

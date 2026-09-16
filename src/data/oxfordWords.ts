@@ -1,10 +1,11 @@
 import { OxfordWord, CEFRLevel } from '../types';
+import { OXFORD_EXPANDED_WORDS } from './oxfordExpandedWords';
 
 /**
  * Authentic Oxford 3000™ (American English) vocabulary database.
  * Directly sourced from the official Oxford 3000 reference.
  */
-export const OXFORD_WORDS: OxfordWord[] = [
+const CORE_OXFORD_WORDS: OxfordWord[] = [
   // ===================== LEVEL A1 (Beginner) =====================
   {
     id: 'a1_about',
@@ -986,9 +987,16 @@ export const CONFUSING_PAIRS = [
     confusedWith: 'although',
     targetMeaning: 'meskipun (preposisi + kata benda)',
     confusedMeaning: 'meskipun (konjungsi + subjek + kata kerja)',
-    explanation: 'Despite diikuti noun/gerund (contoh: despite the rain). Although diikuti klausa lengkap (contoh: although it rained).',
+    explanation: 'Despite diikuti noun/gerund (contoh: despite the rain). Meskipun diikuti klausa lengkap (contoh: although it rained).',
     tip: 'Jangan pernah gunakan "despite of" — itu salah! Cukup tulis "despite".'
   }
+];
+
+export const OXFORD_WORDS: OxfordWord[] = [
+  ...CORE_OXFORD_WORDS,
+  ...OXFORD_EXPANDED_WORDS.filter(
+    (w) => !CORE_OXFORD_WORDS.some((c) => c.word.toLowerCase() === w.word.toLowerCase())
+  )
 ];
 
 export const WORD_FAMILIES = [
